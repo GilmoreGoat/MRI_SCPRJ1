@@ -1,7 +1,7 @@
 
 import importlib
 
-packages = ['torch', 'torch_geometric', 'networkx', 'nilearn']
+packages = ['numpy', 'torch', 'torch_geometric', 'networkx', 'nilearn']
 missing = []
 
 for package in packages:
