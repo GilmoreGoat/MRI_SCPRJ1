@@ -89,7 +89,7 @@ def create_pyg_dataset(features, labels, G):
         # We use edge_index and weight from the base_data
         edge_attr = None
         if hasattr(base_data, 'weight'):
-             edge_attr = base_data.weight
+             edge_attr = base_data.weight.float()
 
         data = Data(x=x, edge_index=base_data.edge_index, edge_attr=edge_attr, y=y)
         data_list.append(data)

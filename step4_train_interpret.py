@@ -192,7 +192,7 @@ def get_top_connections(model, data, top_k=5):
     # But model.forward takes 'data'.
     # We can create a simple class or use the existing Data class if available.
     from torch_geometric.data import Data
-    data_grad = Data(x=x, edge_index=edge_index, batch=batch)
+    data_grad = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, batch=batch)
 
     output = model(data_grad)
 
@@ -286,7 +286,8 @@ if __name__ == "__main__":
 
     # 2. Initialize Model
     # Input: 2 features per node. Output: 3 classes (Normal, MCI, AD)
-    model = GKAN(in_channels=2, hidden_channels=args.hidden_dim, out_channels=3, num_layers=args.num_layers)
+    # edge_dim=1 because we have 1 edge feature (structural covariance weight)
+    model = GKAN(in_channels=2, hidden_channels=args.hidden_dim, out_channels=3, num_layers=args.num_layers, edge_dim=1)
 
     # 3. Train
     print("Starting Training...")
