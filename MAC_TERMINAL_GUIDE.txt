@@ -1,0 +1,132 @@
+MAC TERMINAL GUIDE: How to Run Neuro-GKAN and Interpret Outputs
+================================================================
+
+This guide explains how to set up the environment, run the Neuro-GKAN project, and interpret the results on a Mac terminal.
+
+PREREQUISITES
+-------------
+1.  **Python 3.8+**: Ensure you have Python installed. You can check by running `python3 --version`.
+    -   If not installed, we recommend using Homebrew (`brew install python`) or Pyenv.
+2.  **Terminal Access**: Open the "Terminal" app on your Mac.
+
+INSTALLATION & SETUP
+--------------------
+Follow these steps to prepare your environment.
+
+1.  **Navigate to the Project Folder**:
+    Use the `cd` command to go to the directory where you saved the files.
+    Example:
+    ```bash
+    cd ~/Downloads/neuro-gkan
+    ```
+
+2.  **Create a Virtual Environment**:
+    This isolates the project dependencies from your system Python.
+    ```bash
+    python3 -m venv venv
+    ```
+
+3.  **Activate the Virtual Environment**:
+    You must do this every time you open a new terminal window to work on this project.
+    ```bash
+    source venv/bin/activate
+    ```
+    (You should see `(venv)` appear at the start of your command prompt.)
+
+4.  **Upgrade pip**:
+    Ensure you have the latest package installer.
+    ```bash
+    pip install --upgrade pip
+    ```
+
+5.  **Install Dependencies**:
+    Install the required libraries (PyTorch, PyG, NetworkX, Nilearn, etc.).
+    ```bash
+    pip install torch torchvision torchaudio torch_geometric numpy networkx nilearn matplotlib scipy scikit-learn
+    ```
+
+RUNNING THE CODE
+----------------
+
+### Step 1: Verify Environment
+Run the check script to ensure all libraries are correctly installed.
+
+```bash
+python check_env.py
+```
+**Expected Output:** `All packages are installed.`
+
+### Step 2: Train and Interpret Model
+This is the main script (`step4_train_interpret.py`) that trains the Graph KAN model on simulated brain data and extracts interpretability insights.
+
+**Basic Command:**
+```bash
+python step4_train_interpret.py
+```
+
+**Optional Arguments:**
+You can customize the run with flags:
+-   `--epochs`: Number of training rounds (default: 10).
+-   `--batch_size`: Number of patients per batch (default: 4).
+-   `--num_patients`: Number of simulated subjects (default: 50).
+
+**Example with Arguments:**
+```bash
+python step4_train_interpret.py --epochs 20 --num_patients 100
+```
+
+### Step 3: Visualize Results
+Run `step5_visualize.py` to generate a 3D plot of the most important brain regions.
+
+```bash
+python step5_visualize.py
+```
+**Expected Output:** `Plot saved to gkan_top5_rois.png`
+
+INTERPRETING OUTPUTS
+--------------------
+
+### 1. Console Output (Training Logs)
+During training, you will see lines like:
+```
+Epoch [10/10], Loss: 1.0795, Val Accuracy: 30.00%
+```
+-   **Loss**: Measures how well the model fits the data. Lower is better.
+-   **Val Accuracy**: The percentage of correct diagnoses on the validation set. Higher is better (simulated data may vary).
+
+### 2. Symbolic Formulas
+The script prints "Sample Formulas" representing how the KAN layers transform input features (Cortical Thickness, Volume).
+Example:
+```
+Feature_0->Hidden_0: 0.30*x + 0.02
+```
+-   **Meaning**: The model learned that for Feature 0 (e.g., Thickness), the best transformation to finding patterns is a linear function `0.30 * thickness + 0.02`.
+-   **Why it matters**: Unlike "black box" neural networks, KANs tell you the exact math function used, which is crucial for medical transparency.
+
+### 3. Top Important ROIs
+The script identifies the "Top 5 Important ROIs" (Regions of Interest).
+Example:
+```
+Top 5 Important ROIs (Region Index, Importance Score):
+  ROI 52: 0.0163
+  ROI 37: 0.0153
+```
+-   **Meaning**: These are the specific brain regions (nodes in the graph) that the model relied on most to make its diagnosis.
+-   **Interpretation**: If ROI 52 corresponds to the Hippocampus, the model suggests hippocampal atrophy is a key marker for the disease.
+
+### 4. Visual Output (`gkan_top5_rois.png`)
+Running `step5_visualize.py` creates an image file named `gkan_top5_rois.png`.
+-   **What it shows**: A "glass brain" (transparent 3D brain model).
+-   **Red Nodes**: The Top 5 most important ROIs found by the model.
+-   **Red Lines**: The structural connections (edges) between these regions or their strongest neighbors.
+-   **Use**: Open this image to visually confirm if the identified regions make anatomical sense (e.g., are they in the temporal lobe?).
+
+TROUBLESHOOTING
+---------------
+-   **`ModuleNotFoundError: No module named ...`**:
+    You likely forgot to activate the virtual environment or install dependencies.
+    Run `source venv/bin/activate` and try installing the missing package again.
+-   **`zsh: command not found: python`**:
+    Try using `python3` instead of `python`.
+-   **Plotting Errors**:
+    If `step5_visualize.py` fails with display errors, ensure you are not running it on a headless server without a display backend, or ignore warnings if the file is still generated.
