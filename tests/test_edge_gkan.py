@@ -8,10 +8,10 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from step1_preprocessing import simulate_adni_data, build_structural_covariance_graph, create_pyg_dataset
-from step3_gkan_model import GKAN
+from step3_gkan_model import EdgeGKAN
 
 def test_gkan_forward():
-    print("Testing GKAN Forward Pass...")
+    print("Testing EdgeGKAN Forward Pass...")
 
     # Simulate minimal data
     num_patients = 2
@@ -24,7 +24,7 @@ def test_gkan_forward():
 
     # Initialize model with edge_dim=1 (as per our new architecture)
     try:
-        model = GKAN(in_channels=2, hidden_channels=8, out_channels=3, num_layers=2, edge_dim=1)
+        model = EdgeGKAN(in_channels=2, hidden_channels=8, out_channels=3, num_layers=2, edge_dim=1)
         print("Model initialized with edge_dim=1.")
     except Exception as e:
         print(f"Model init failed: {e}")
@@ -32,7 +32,9 @@ def test_gkan_forward():
 
     # Forward pass
     try:
-        out = model(data)
+        # Pass arguments explicitly: x, edge_index, edge_attr, batch
+        batch = getattr(data, 'batch', None)
+        out = model(data.x, data.edge_index, data.edge_attr, batch)
         print(f"Forward pass successful. Output shape: {out.shape}")
         assert out.shape == (1, 3)
     except Exception as e:
