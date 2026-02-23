@@ -37,6 +37,18 @@ def simulate_adni_data(num_patients=100, num_rois=90, seed=42):
             features[i, sensitive_rois, 0] -= 0.2
             features[i, sensitive_rois, 1] -= 300
 
+    # Normalize features to [-1, 1] using Min-Max scaling
+    # This is crucial for KAN layers which operate on a fixed grid (default [-1, 1])
+    for i in range(2):
+        feat = features[:, :, i]
+        min_val = feat.min()
+        max_val = feat.max()
+        # Avoid division by zero if max == min
+        if max_val > min_val:
+            features[:, :, i] = 2 * (feat - min_val) / (max_val - min_val) - 1
+        else:
+            features[:, :, i] = 0.0  # Center if constant
+
     return features, labels
 
 def build_structural_covariance_graph(features, threshold=0.1):
