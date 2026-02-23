@@ -57,13 +57,17 @@ def build_structural_covariance_graph(features, threshold=0.1):
     num_rois = features.shape[1]
     G.add_nodes_from(range(num_rois))
 
-    # Add edges based on threshold
-    # Since data is random, correlations might be weak, so we use a low threshold for the simulation to ensure edges exist.
-    for i in range(num_rois):
-        for j in range(i + 1, num_rois):
-            if abs(corr_matrix[i, j]) > threshold:
-                # We can store the correlation as weight
-                G.add_edge(i, j, weight=abs(corr_matrix[i, j]))
+    # Add edges based on threshold using vectorized operations for better performance.
+    # We use the upper triangle of the correlation matrix to avoid duplicate edges and self-loops.
+    i_indices, j_indices = np.triu_indices(num_rois, k=1)
+    abs_corrs = np.abs(corr_matrix[i_indices, j_indices])
+
+    # Filter by threshold
+    mask = abs_corrs > threshold
+
+    # G.add_weighted_edges_from expects an iterable of (u, v, w) tuples
+    edges = zip(i_indices[mask], j_indices[mask], abs_corrs[mask])
+    G.add_weighted_edges_from(edges)
 
     return G
 
@@ -79,6 +83,9 @@ def create_pyg_dataset(features, labels, G):
     Returns:
         list: A list of torch_geometric.data.Data objects.
     """
+    if len(features) != len(labels):
+        raise ValueError(f"Features and labels must have the same length, but got {len(features)} and {len(labels)} respectively.")
+
     data_list = []
 
     # Convert NetworkX graph to edge_index (topology is shared)
