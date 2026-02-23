@@ -68,6 +68,9 @@ def build_structural_covariance_graph(features, threshold=0.1):
     return G
 
 def create_pyg_dataset(features, labels, G):
+    if len(features) != len(labels):
+        raise ValueError(f"Features and labels must have the same length, but got {len(features)} and {len(labels)} respectively.")
+
     data_list = []
 
     # Convert NetworkX graph to edge_index (topology is shared)
