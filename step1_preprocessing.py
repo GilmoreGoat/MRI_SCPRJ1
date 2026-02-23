@@ -68,6 +68,17 @@ def build_structural_covariance_graph(features, threshold=0.1):
     return G
 
 def create_pyg_dataset(features, labels, G):
+    """
+    Converts patient features and labels into a list of PyTorch Geometric Data objects.
+
+    Args:
+        features (np.ndarray): Patient features of shape [num_patients, num_rois, num_features].
+        labels (np.ndarray): Patient labels of shape [num_patients].
+        G (nx.Graph): A NetworkX graph representing the shared brain topology.
+
+    Returns:
+        list: A list of torch_geometric.data.Data objects.
+    """
     data_list = []
 
     # Convert NetworkX graph to edge_index (topology is shared)
