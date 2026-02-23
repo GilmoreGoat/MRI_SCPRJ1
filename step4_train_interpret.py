@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch.utils.data import DataLoader
+import argparse
+from torch_geometric.loader import DataLoader
 from step1_preprocessing import simulate_adni_data, build_structural_covariance_graph, create_pyg_dataset
 from step3_gkan_model import GKAN
 from step2_kan_layer import coef2curve
@@ -244,13 +245,34 @@ def interpret_kan(model, data, device='cpu'):
     return formulas, top_regions
 
 if __name__ == "__main__":
+    # Argument Parser
+    parser = argparse.ArgumentParser(description="Train GKAN model on simulated ADNI data.")
+    parser.add_argument("--epochs", type=int, default=10, help="Number of training epochs")
+    parser.add_argument("--batch_size", type=int, default=4, help="Batch size")
+    parser.add_argument("--lr", type=float, default=0.01, help="Learning rate")
+    parser.add_argument("--hidden_dim", type=int, default=8, help="Hidden dimension size")
+    parser.add_argument("--num_layers", type=int, default=2, help="Number of GKAN layers")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--num_patients", type=int, default=50, help="Number of simulated patients")
+    parser.add_argument("--device", type=str, default='auto', help="Device (cpu/cuda/auto)")
+
+    args = parser.parse_args()
+
     # Setup
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    if args.device == 'auto':
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    else:
+        device = torch.device(args.device)
+
     print(f"Using device: {device}")
 
+    # Set seed
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+
     # 1. Simulate Data
-    print("Simulating Data...")
-    features, labels = simulate_adni_data(num_patients=50, num_rois=90)
+    print(f"Simulating Data (Patients: {args.num_patients})...")
+    features, labels = simulate_adni_data(num_patients=args.num_patients, num_rois=90, seed=args.seed)
     G = build_structural_covariance_graph(features, threshold=0.1)
     dataset = create_pyg_dataset(features, labels, G)
 
@@ -259,21 +281,24 @@ if __name__ == "__main__":
     val_size = len(dataset) - train_size
     train_dataset, val_dataset = torch.utils.data.random_split(dataset, [train_size, val_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False)
 
     # 2. Initialize Model
     # Input: 2 features per node. Output: 3 classes (Normal, MCI, AD)
-    model = GKAN(in_channels=2, hidden_channels=8, out_channels=3)
+    model = GKAN(in_channels=2, hidden_channels=args.hidden_dim, out_channels=3, num_layers=args.num_layers)
 
     # 3. Train
     print("Starting Training...")
-    optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.lr)
     criterion = nn.CrossEntropyLoss()
 
-    train_losses, val_accs = train_model(model, train_loader, val_loader, optimizer, criterion, epochs=5, device=device)
+    train_losses, val_accs = train_model(model, train_loader, val_loader, optimizer, criterion, epochs=args.epochs, device=device)
 
     # 4. Interpret
-    print("Running Interpretability on a validation sample...")
-    sample_patient = val_dataset[0].to(device)
-    interpret_kan(model, sample_patient, device=device)
+    if len(val_dataset) > 0:
+        print("Running Interpretability on a validation sample...")
+        sample_patient = val_dataset[0].to(device)
+        interpret_kan(model, sample_patient, device=device)
+    else:
+        print("Validation set empty, skipping interpretability.")
