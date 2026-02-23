@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from nilearn import plotting
 import torch
 from step1_preprocessing import simulate_adni_data, build_structural_covariance_graph, create_pyg_dataset
-from step3_gkan_model import GKAN
+from step3_gkan_model import EdgeGKAN
 from step4_train_interpret import train_model, get_top_connections
 from torch_geometric.loader import DataLoader
 
@@ -69,7 +69,7 @@ def main():
     # 2. Train Model
     print("Training Model...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = GKAN(in_channels=2, hidden_channels=8, out_channels=3, num_layers=2)
+    model = EdgeGKAN(in_channels=2, hidden_channels=8, out_channels=3, num_layers=2, edge_dim=1)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
     criterion = torch.nn.CrossEntropyLoss()
 
