@@ -4,15 +4,15 @@ import numpy as np
 import argparse
 from torch_geometric.loader import DataLoader
 from step1_preprocessing import simulate_adni_data, build_structural_covariance_graph, create_pyg_dataset
-from step3_gkan_model import GKAN
+from step3_gkan_model import EdgeGKAN
 from step2_kan_layer import coef2curve
 
 def train_model(model, train_loader, val_loader, optimizer, criterion, epochs=10, device='cpu'):
     """
-    Standard PyTorch training loop for GKAN model.
+    Standard PyTorch training loop for EdgeGKAN model.
 
     Args:
-        model (nn.Module): The GKAN model.
+        model (nn.Module): The EdgeGKAN model.
         train_loader (DataLoader): DataLoader for training data.
         val_loader (DataLoader): DataLoader for validation data.
         optimizer (torch.optim.Optimizer): Optimizer (e.g., AdamW).
@@ -37,7 +37,8 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs=10
             optimizer.zero_grad()
 
             # Forward pass
-            outputs = model(data)
+            # Pass edge attributes explicitly
+            outputs = model(data.x, data.edge_index, data.edge_attr, data.batch)
             loss = criterion(outputs, data.y)
 
             # Backward pass and optimize
@@ -56,7 +57,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs=10
         with torch.no_grad():
             for data in val_loader:
                 data = data.to(device)
-                outputs = model(data)
+                outputs = model(data.x, data.edge_index, data.edge_attr, data.batch)
                 _, predicted = torch.max(outputs.data, 1)
                 total += data.y.size(0)
                 correct += predicted.eq(data.y).sum().item()
@@ -189,12 +190,9 @@ def get_top_connections(model, data, top_k=5):
     # because model(data) extracts x, edge_index from data.
 
     # Simple wrapper to pass tensors
-    # But model.forward takes 'data'.
-    # We can create a simple class or use the existing Data class if available.
-    from torch_geometric.data import Data
-    data_grad = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, batch=batch)
+    # model.forward takes x, edge_index, edge_attr, batch
 
-    output = model(data_grad)
+    output = model(x, edge_index, edge_attr, batch)
 
     # Target class score
     target_class = data.y.item()
@@ -287,7 +285,7 @@ if __name__ == "__main__":
     # 2. Initialize Model
     # Input: 2 features per node. Output: 3 classes (Normal, MCI, AD)
     # edge_dim=1 because we have 1 edge feature (structural covariance weight)
-    model = GKAN(in_channels=2, hidden_channels=args.hidden_dim, out_channels=3, num_layers=args.num_layers, edge_dim=1)
+    model = EdgeGKAN(in_channels=2, hidden_channels=args.hidden_dim, out_channels=3, num_layers=args.num_layers, edge_dim=1)
 
     # 3. Train
     print("Starting Training...")

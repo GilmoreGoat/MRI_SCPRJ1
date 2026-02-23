@@ -61,12 +61,12 @@ class GKANConv(MessagePassing):
         # Normalize node features.
         return norm.view(-1, 1) * out
 
-class GKAN(nn.Module):
+class EdgeGKAN(nn.Module):
     """
     Graph Neural Network using KAN layers for feature transformation and classification.
     """
     def __init__(self, in_channels, hidden_channels, out_channels, num_layers=2, edge_dim=0):
-        super(GKAN, self).__init__()
+        super(EdgeGKAN, self).__init__()
         self.convs = nn.ModuleList()
 
         # First layer
@@ -83,12 +83,7 @@ class GKAN(nn.Module):
         # Replacing MLP with KAN means: hidden -> out (3 classes)
         self.head = KANLinear(hidden_channels, out_channels)
 
-    def forward(self, data):
-        x, edge_index, batch = data.x, data.edge_index, data.batch
-
-        # Extract edge attributes if available
-        edge_attr = getattr(data, 'edge_attr', None)
-
+    def forward(self, x, edge_index, edge_attr=None, batch=None):
         # Convolutions
         for conv in self.convs:
             x = conv(x, edge_index, edge_attr=edge_attr)
