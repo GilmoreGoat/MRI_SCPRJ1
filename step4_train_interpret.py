@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from torch.utils.data import DataLoader
+from torch_geometric.loader import DataLoader
 from step1_preprocessing import simulate_adni_data, build_structural_covariance_graph, create_pyg_dataset
 from step3_gkan_model import GKAN
 from step2_kan_layer import coef2curve
