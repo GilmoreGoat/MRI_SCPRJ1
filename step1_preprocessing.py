@@ -29,13 +29,17 @@ def simulate_adni_data(num_patients=100, num_rois=90, seed=42):
     # Let's assume ROIs 0-10 are sensitive
     sensitive_rois = list(range(10))
 
-    for i in range(num_patients):
-        if labels[i] == 2: # AD
-            features[i, sensitive_rois, 0] -= 0.5 # Thinner
-            features[i, sensitive_rois, 1] -= 800 # Smaller volume
-        elif labels[i] == 1: # MCI
-            features[i, sensitive_rois, 0] -= 0.2
-            features[i, sensitive_rois, 1] -= 300
+    # Vectorized optimization using integer indexing
+    idx_ad = np.where(labels == 2)[0]
+    idx_mci = np.where(labels == 1)[0]
+
+    # Apply changes for AD
+    features[np.ix_(idx_ad, sensitive_rois, [0])] -= 0.5 # Thinner
+    features[np.ix_(idx_ad, sensitive_rois, [1])] -= 800 # Smaller volume
+
+    # Apply changes for MCI
+    features[np.ix_(idx_mci, sensitive_rois, [0])] -= 0.2
+    features[np.ix_(idx_mci, sensitive_rois, [1])] -= 300
 
     # Normalize features to [-1, 1] using Min-Max scaling
     # This is crucial for KAN layers which operate on a fixed grid (default [-1, 1])
