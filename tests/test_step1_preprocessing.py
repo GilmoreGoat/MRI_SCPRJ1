@@ -1,5 +1,4 @@
 import numpy as np
-import networkx as nx
 import unittest
 from step1_preprocessing import build_structural_covariance_graph
 
