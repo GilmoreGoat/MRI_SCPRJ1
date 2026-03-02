@@ -62,7 +62,7 @@ def train_model(model, train_loader, val_loader, optimizer, criterion, epochs=10
                 total += data.y.size(0)
                 correct += predicted.eq(data.y).sum().item()
 
-        val_acc = 100 * correct / total
+        val_acc = (100 * correct / total) if total > 0 else 0.0
         val_accuracies.append(val_acc)
 
         print(f"Epoch [{epoch+1}/{epochs}], Loss: {avg_train_loss:.4f}, Val Accuracy: {val_acc:.2f}%")
