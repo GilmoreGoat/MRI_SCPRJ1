@@ -1,7 +1,8 @@
 import numpy as np
 import networkx as nx
 import unittest
-from step1_preprocessing import build_structural_covariance_graph
+import torch
+from step1_preprocessing import build_structural_covariance_graph, create_pyg_dataset
 
 class TestStep1(unittest.TestCase):
     def test_build_graph_threshold_above_one(self):
@@ -80,6 +81,47 @@ class TestStep1(unittest.TestCase):
 
         G = build_structural_covariance_graph(features_zero, threshold=0.01)
         self.assertEqual(G.number_of_edges(), 0)
+
+    def test_create_pyg_dataset_length_mismatch(self):
+        """Verify that a ValueError is raised when features and labels have different lengths."""
+        features = np.random.rand(10, 5, 2)
+        labels = np.random.randint(0, 3, size=9) # Length 9 instead of 10
+        G = nx.Graph()
+
+        with self.assertRaises(ValueError) as context:
+            create_pyg_dataset(features, labels, G)
+
+        self.assertIn("Features and labels must have the same length", str(context.exception))
+
+    def test_create_pyg_dataset_success(self):
+        """Verify that create_pyg_dataset returns a list of Data objects with correct properties."""
+        num_patients = 5
+        num_rois = 10
+        num_features = 2
+        features = np.random.rand(num_patients, num_rois, num_features).astype(np.float32)
+        labels = np.random.randint(0, 3, size=num_patients)
+
+        # Create a simple graph
+        G = nx.Graph()
+        G.add_nodes_from(range(num_rois))
+        G.add_edge(0, 1, weight=0.5)
+
+        dataset = create_pyg_dataset(features, labels, G)
+
+        self.assertEqual(len(dataset), num_patients)
+        for i in range(num_patients):
+            data = dataset[i]
+            # Check node features
+            self.assertTrue(torch.equal(data.x, torch.tensor(features[i])))
+            self.assertEqual(data.x.shape, (num_rois, num_features))
+            # Check labels
+            self.assertEqual(data.y.item(), labels[i])
+            # Check edge_index
+            self.assertEqual(data.edge_index.shape[0], 2)
+            self.assertEqual(data.edge_index.shape[1], 2) # Undirected edge (0,1) and (1,0)
+            # Check edge_attr (weights)
+            self.assertIsNotNone(data.edge_attr)
+            self.assertEqual(data.edge_attr.shape[0], 2)
 
 if __name__ == '__main__':
     unittest.main()
