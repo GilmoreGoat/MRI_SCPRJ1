@@ -49,12 +49,12 @@ def generate_rois_coordinates(num_rois=90, seed=42):
 
     return coords
 
-def main():
-    print("Step 5: Visualization")
-
-    # 1. Simulate Data
+def prepare_data(num_patients=50, num_rois=90, seed=42):
+    """
+    Simulates ADNI data, builds a structural covariance graph, and creates PyG datasets and loaders.
+    """
     print("Simulating Data...")
-    features, labels = simulate_adni_data(num_patients=50, num_rois=90, seed=42)
+    features, labels = simulate_adni_data(num_patients=num_patients, num_rois=num_rois, seed=seed)
     G = build_structural_covariance_graph(features, threshold=0.1)
     dataset = create_pyg_dataset(features, labels, G)
 
@@ -66,99 +66,117 @@ def main():
     train_loader = DataLoader(train_dataset, batch_size=4, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=4, shuffle=False)
 
-    # 2. Train Model
+    return train_loader, val_loader, G, val_dataset
+
+def train_gkan_model(train_loader, val_loader, device):
+    """
+    Initializes and trains the EdgeGKAN model.
+    """
     print("Training Model...")
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = EdgeGKAN(in_channels=2, hidden_channels=8, out_channels=3, num_layers=2, edge_dim=1)
     optimizer = torch.optim.AdamW(model.parameters(), lr=0.01)
     criterion = torch.nn.CrossEntropyLoss()
 
     train_model(model, train_loader, val_loader, optimizer, criterion, epochs=10, device=device)
+    return model
 
-    # 3. Get Top 5 ROIs
+def identify_top_rois(model, val_dataset, device, top_k=5):
+    """
+    Identifies the top K most influential ROIs based on the trained model.
+    """
     print("Identifying Top 5 ROIs...")
     if len(val_dataset) > 0:
         # Use the first validation patient
         patient_data = val_dataset[0].to(device)
-        top_regions = get_top_connections(model, patient_data, top_k=5)
+        top_regions = get_top_connections(model, patient_data, top_k=top_k)
 
         top_roi_indices = [roi for roi, score in top_regions]
         print(f"Top 5 ROIs: {top_roi_indices}")
-
-        # 4. Visualization
-        print("Generating Glass Brain Plot...")
-
-        coords = generate_rois_coordinates(num_rois=90, seed=42)
-
-        # Construct adjacency matrix for visualization
-        # Initialize with zeros
-        adj_matrix = np.zeros((90, 90))
-
-        # Highlight connections between Top 5 ROIs if they exist
-        has_edges = False
-
-        # We need to map G edges to adj_matrix
-        # G is a NetworkX graph with integer nodes 0..89
-
-        # Check if there are edges between any pair of Top 5 ROIs
-        for i in top_roi_indices:
-            for j in top_roi_indices:
-                if i < j:
-                    if G.has_edge(i, j):
-                        adj_matrix[i, j] = 1.0
-                        adj_matrix[j, i] = 1.0
-                        has_edges = True
-
-        # If no internal edges, show edges to strongest neighbors
-        if not has_edges:
-            print("No direct connections between Top 5 ROIs found in graph. Adding connections to strongest neighbors.")
-            for i in top_roi_indices:
-                neighbors = list(G.neighbors(i))
-                if neighbors:
-                    # Pick neighbor with highest weight? Or just first
-                    # G has 'weight' attribute on edges
-
-                    # Sort neighbors by weight
-                    sorted_neighbors = sorted(neighbors, key=lambda n: G[i][n]['weight'], reverse=True)
-
-                    if sorted_neighbors:
-                        best_neighbor = sorted_neighbors[0]
-                        adj_matrix[i, best_neighbor] = 1.0
-                        adj_matrix[best_neighbor, i] = 1.0
-
-        # Prepare node colors and sizes
-        # Default: small blue dots
-        node_color = ['blue'] * 90
-        node_size = [10] * 90
-
-        # Top 5: larger red dots
-        for idx in top_roi_indices:
-            node_color[idx] = 'red'
-            node_size[idx] = 100  # Larger size for emphasis
-
-        output_file = "gkan_top5_rois.png"
-
-        # Plot connectome
-        # node_color can be a list of colors
-        # But plot_connectome expects 'node_color' as a list of strings
-
-        plotting.plot_connectome(
-            adjacency_matrix=adj_matrix,
-            node_coords=coords,
-            node_color=node_color,
-            node_size=node_size,
-            edge_cmap='Reds', # Red edges
-            edge_vmin=0.1,    # Minimum edge value to show
-            edge_vmax=1.0,
-            edge_threshold=0.5, # Only show strong edges if we set values to 1.0
-            display_mode='lzry', # Left, Z (axial), Right, Y (coronal) views
-            output_file=output_file,
-            title="Top 5 ROIs & Degraded Connections (Simulated)"
-        )
-
-        print(f"Plot saved to {output_file}")
+        return top_roi_indices
     else:
         print("Validation dataset is empty. Cannot identify Top 5 ROIs.")
+        return None
+
+def visualize_top_rois(top_roi_indices, G, num_rois=90, seed=42, output_file="gkan_top5_rois.png"):
+    """
+    Generates a glass brain plot highlighting the top ROIs and their connections.
+    """
+    print("Generating Glass Brain Plot...")
+    coords = generate_rois_coordinates(num_rois=num_rois, seed=seed)
+
+    # Construct adjacency matrix for visualization
+    # Initialize with zeros
+    adj_matrix = np.zeros((num_rois, num_rois))
+
+    # Highlight connections between Top 5 ROIs if they exist
+    has_edges = False
+
+    # Check if there are edges between any pair of Top 5 ROIs
+    for i in top_roi_indices:
+        for j in top_roi_indices:
+            if i < j:
+                if G.has_edge(i, j):
+                    adj_matrix[i, j] = 1.0
+                    adj_matrix[j, i] = 1.0
+                    has_edges = True
+
+    # If no internal edges, show edges to strongest neighbors
+    if not has_edges:
+        print("No direct connections between Top 5 ROIs found in graph. Adding connections to strongest neighbors.")
+        for i in top_roi_indices:
+            neighbors = list(G.neighbors(i))
+            if neighbors:
+                # Sort neighbors by weight
+                sorted_neighbors = sorted(neighbors, key=lambda n: G[i][n]['weight'], reverse=True)
+
+                if sorted_neighbors:
+                    best_neighbor = sorted_neighbors[0]
+                    adj_matrix[i, best_neighbor] = 1.0
+                    adj_matrix[best_neighbor, i] = 1.0
+
+    # Prepare node colors and sizes
+    # Default: small blue dots
+    node_color = ['blue'] * num_rois
+    node_size = [10] * num_rois
+
+    # Top 5: larger red dots
+    for idx in top_roi_indices:
+        node_color[idx] = 'red'
+        node_size[idx] = 100  # Larger size for emphasis
+
+    # Plot connectome
+    plotting.plot_connectome(
+        adjacency_matrix=adj_matrix,
+        node_coords=coords,
+        node_color=node_color,
+        node_size=node_size,
+        edge_cmap='Reds', # Red edges
+        edge_vmin=0.1,    # Minimum edge value to show
+        edge_vmax=1.0,
+        edge_threshold=0.5, # Only show strong edges if we set values to 1.0
+        display_mode='lzry', # Left, Z (axial), Right, Y (coronal) views
+        output_file=output_file,
+        title="Top 5 ROIs & Degraded Connections (Simulated)"
+    )
+
+    print(f"Plot saved to {output_file}")
+
+def main():
+    print("Step 5: Visualization")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    # 1. Prepare Data
+    train_loader, val_loader, G, val_dataset = prepare_data()
+
+    # 2. Train Model
+    model = train_gkan_model(train_loader, val_loader, device)
+
+    # 3. Identify Top ROIs
+    top_roi_indices = identify_top_rois(model, val_dataset, device)
+
+    # 4. Visualization
+    if top_roi_indices:
+        visualize_top_rois(top_roi_indices, G)
 
 if __name__ == "__main__":
     main()
