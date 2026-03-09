@@ -78,11 +78,20 @@ def curve2coef(x_eval, y_eval, grid, k, device='cpu'):
     return coef
 
 def extend_grid(grid, k_extend=0):
+    if k_extend <= 0:
+        return grid
     h = (grid[:, [-1]] - grid[:, [0]]) / (grid.shape[1] - 1)
-    for i in range(k_extend):
-        grid = torch.cat([grid[:, [0]] - h, grid], dim=1)
-        grid = torch.cat([grid, grid[:, [-1]] + h], dim=1)
-    return grid
+
+    # Vectorized grid extension: create all steps at once to avoid repeated cat operations
+    # Left extension: [grid[:, [0]] - k_extend*h, ..., grid[:, [0]] - h]
+    steps_left = torch.arange(k_extend, 0, -1, device=grid.device, dtype=grid.dtype).reshape(1, -1)
+    left_grid = grid[:, [0]] - steps_left * h
+
+    # Right extension: [grid[:, [-1]] + h, ..., grid[:, [-1]] + k_extend*h]
+    steps_right = torch.arange(1, k_extend + 1, device=grid.device, dtype=grid.dtype).reshape(1, -1)
+    right_grid = grid[:, [-1]] + steps_right * h
+
+    return torch.cat([left_grid, grid, right_grid], dim=1)
 
 class KANLinear(nn.Module):
     def __init__(self, in_dim, out_dim, grid_size=5, k=3, noise_scale=0.1,
