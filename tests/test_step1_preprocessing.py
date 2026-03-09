@@ -1,6 +1,7 @@
 import numpy as np
 import unittest
-from step1_preprocessing import build_structural_covariance_graph
+import networkx as nx
+from step1_preprocessing import build_structural_covariance_graph, create_pyg_dataset
 
 class TestStep1(unittest.TestCase):
     def test_build_graph_threshold_above_one(self):
@@ -79,6 +80,20 @@ class TestStep1(unittest.TestCase):
 
         G = build_structural_covariance_graph(features_zero, threshold=0.01)
         self.assertEqual(G.number_of_edges(), 0)
+
+    def test_create_pyg_dataset_length_mismatch(self):
+        """Verify that create_pyg_dataset raises ValueError when features and labels have different lengths."""
+        # Setup: 10 patients for features, but 9 labels
+        num_patients = 10
+        num_rois = 5
+        features = np.random.rand(num_patients, num_rois, 2)
+        labels = np.random.randint(0, 3, size=num_patients - 1)
+        G = nx.Graph()
+        G.add_nodes_from(range(num_rois))
+
+        # Test and Verify
+        with self.assertRaisesRegex(ValueError, "Features and labels must have the same length"):
+            create_pyg_dataset(features, labels, G)
 
 if __name__ == '__main__':
     unittest.main()
