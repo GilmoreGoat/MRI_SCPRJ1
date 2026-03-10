@@ -81,7 +81,8 @@ def get_symbolic_formula(kan_layer, device='cpu', prune_threshold=0.01):
     # Generate evaluation points in [-1, 1]
     # We evaluate all splines simultaneously
     num_points = 100
-    x_eval = torch.linspace(-1, 1, steps=num_points).unsqueeze(1).repeat(1, in_dim).to(device) # [100, in_dim]
+    # Use expand() instead of repeat() to avoid redundant memory allocation
+    x_eval = torch.linspace(-1, 1, steps=num_points, device=device).unsqueeze(1).expand(-1, in_dim) # [100, in_dim]
 
     with torch.no_grad():
         # Get spline output: [num_points, in_dim, out_dim]
